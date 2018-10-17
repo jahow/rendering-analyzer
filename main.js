@@ -39,7 +39,12 @@ function PerfAnalyzer() {
 }
 
 PerfAnalyzer.prototype.render = function() {
-  renderGraph(this._element, this._frames);
+  renderGraph(
+    this._element,
+    this._frames,
+    this._knownMeasures,
+    this._knownEvents
+  );
 };
 
 // PUBLIC API
@@ -67,7 +72,7 @@ PerfAnalyzer.prototype.beginMeasurement = function(name, color) {
   }
 
   if (this._currentMeasureName) {
-    this._currentFrame.measures[_currentMeasureName] =
+    this._currentFrame.measures[this._currentMeasureName] =
       performance.now() - this._currentMeasureStart;
   }
   this._currentMeasureName = name;
@@ -97,10 +102,10 @@ PerfAnalyzer.prototype.endMeasurement = function(name) {
     return;
   }
 
-  if (!this._currentFrame.measures[_currentMeasureName]) {
-    this._currentFrame.measures[_currentMeasureName] = 0;
+  if (!this._currentFrame.measures[this._currentMeasureName]) {
+    this._currentFrame.measures[this._currentMeasureName] = 0;
   }
-  this._currentFrame.measures[_currentMeasureName] +=
+  this._currentFrame.measures[this._currentMeasureName] +=
     performance.now() - this._currentMeasureStart;
   this._currentMeasureName = null;
   this._currentMeasureStart = -1;
