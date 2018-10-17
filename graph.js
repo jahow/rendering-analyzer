@@ -46,7 +46,6 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
       .select(domElement)
       .append('div')
       .attr('id', 'perfanalyzer-tooltip')
-      .attr('width', 100)
       .style('color', 'white')
       .style('background-color', 'rgba(0, 0, 0, 0.65)')
       .style('position', 'absolute')
@@ -121,14 +120,21 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
         name =>
           (text += `<br>${name}: ${(d.data.measures[name] || 0).toFixed(1)}`)
       );
+      if (Object.keys(d.data.events).length) {
+        text += `<br>events:`;
+        Object.keys(d.data.events).forEach(event => {
+          text += `<br> • ${d.data.events[event]} × ${event}`;
+        });
+      }
       tooltip.html(text);
 
       // update rect & pos
-      var tooltipRect = tooltip.select('rect');
-      var xPos = i * (frameWidth + framePadding) + frameWidth / 2 - 50;
-      xPos = Math.min(graphWidth - 100, Math.max(0, xPos));
+      var halfWidth = tooltip.node().clientWidth / 2;
+      var xPos = i * (frameWidth + framePadding) + frameWidth / 2 - halfWidth;
+      xPos = Math.min(graphWidth - halfWidth, Math.max(0, xPos));
       var yPos =
         Math.min(graphHeight * (d.data.total / maxFrameTime), graphHeight) + 10;
-      tooltip.style('transform', `translate(${xPos}px,${-yPos}px)`);
+      tooltip.style('bottom', `${yPos}px`);
+      tooltip.style('left', `${xPos}px`);
     });
 }
