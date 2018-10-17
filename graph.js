@@ -2,18 +2,11 @@ import * as d3 from 'd3';
 import * as Utils from './utils';
 
 var svg;
+var tooltip;
 
 export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
   if (!domElement || !domElement.clientWidth) {
     return;
-  }
-
-  // init
-  if (!svg) {
-    svg = d3.select(domElement).append('svg');
-    svg.append('g').attr('id', 'perfanalyzer-times');
-    svg.append('g').attr('id', 'perfanalyzer-events');
-    svg.append('line').attr('id', 'perfanalyzer-target-time');
   }
 
   // params
@@ -29,24 +22,61 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
     frames.length > maxVisibleFrames
       ? frames.slice(frames.length - maxVisibleFrames, frames.length - 1)
       : frames;
-
-  // update size
-  svg
-    .attr('width', graphWidth)
-    .attr('height', graphHeight)
-    .attr('transform', `translate(${padding}, ${padding})`);
-
-  // data preparation: compute remaining time, computeeasure colors, names list
   var measureNames = Object.keys(knownMeasures);
-  visibleFrames.forEach(function(frame) {
-    frame.measures._remaining = frame.total;
-    Object.keys(frame.measures).forEach(name => {
-      frame.measures._remaining -= frame.measures[name];
-      if (measureNames.indexOf(name) === -1) {
-        measureNames.push(name);
-      }
+  measureNames.push('_remaining');
+
+  // init
+  if (!svg) {
+    svg = d3.select(domElement).append('svg');
+    svg.append('g').attr('id', 'perfanalyzer-times');
+    svg.append('g').attr('id', 'perfanalyzer-events');
+
+    // update size
+    svg
+      .attr('width', graphWidth)
+      .attr('height', graphHeight)
+      .attr('transform', `translate(${padding}, ${padding})`);
+
+    // target frame time
+    var lineY =
+      Math.round(graphHeight * (1 - targetFrameTime / maxFrameTime) + 0.5) -
+      0.5;
+    svg
+      .append('line')
+      .attr('id', 'perfanalyzer-target-time')
+      .attr('stroke', 'red')
+      .attr('x1', 0)
+      .attr('x2', graphWidth)
+      .attr('y1', lineY)
+      .attr('y2', lineY);
+
+    tooltip = d3
+      .select(domElement)
+      .append('div')
+      .attr('id', 'perfanalyzer-tooltip')
+      .attr('width', 100)
+      .style('color', 'white')
+      .style('background-color', 'rgba(0, 0, 0, 0.65)')
+      .style('position', 'absolute')
+      .style('bottom', 0)
+      .style('left', 0)
+      .style('padding', '4px')
+      .style('font-size', '11px')
+      .style('font-family', 'monospace')
+      .style('pointer-events', 'none')
+      .style('display', 'none');
+  }
+
+  // data preparation: compute remaining time
+  visibleFrames
+    .filter(frame => frame.measures._remaining === undefined)
+    .forEach(function(frame) {
+      var rem = frame.total;
+      Object.keys(frame.measures).forEach(name => {
+        rem -= frame.measures[name];
+      });
+      frame.measures._remaining = rem;
     });
-  });
 
   // update stacked bars (times)
   var stack = d3
@@ -74,7 +104,7 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
   bars.enter().append('rect');
   bars.exit().remove();
   bars
-    .attr('height', d => (d[1] / maxFrameTime) * graphHeight)
+    .attr('height', d => ((d[1] - d[0]) / maxFrameTime) * graphHeight)
     .attr('width', frameWidth)
     .attr('x', (d, i) => i * (frameWidth + framePadding))
     .attr('y', function(d) {
@@ -85,14 +115,30 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
       );
     });
 
-  // target frame time
-  var lineY =
-    Math.round(graphHeight * (1 - targetFrameTime / maxFrameTime) + 0.5) - 0.5;
-  svg
-    .select('line#perfanalyzer-target-time')
-    .attr('stroke', 'red')
-    .attr('x1', 0)
-    .attr('x2', graphWidth)
-    .attr('y1', lineY)
-    .attr('y2', lineY);
+  // tooltip
+  bars
+    .enter()
+    .selectAll('rect')
+    .on('mouseover', function() {
+      tooltip.style('display', null);
+    })
+    .on('mouseout', function() {
+      tooltip.style('display', 'none');
+    })
+    .on('mousemove', function(d, i) {
+      // tooltip content
+      var text = `total: ${d.data.total.toFixed(1)}`;
+      measureNames.forEach(
+        name =>
+          (text += `<br>${name}: ${(d.data.measures[name] || 0).toFixed(1)}`)
+      );
+      tooltip.html(text);
+
+      // update rect & pos
+      var tooltipRect = tooltip.select('rect');
+      var xPosition = i * (frameWidth + framePadding) + frameWidth / 2 - 50;
+      var yPosition =
+        Math.min(graphHeight * (d.data.total / maxFrameTime), graphHeight) + 10;
+      tooltip.style('transform', `translate(${xPosition}px,${-yPosition}px)`);
+    });
 }
