@@ -1,0 +1,28 @@
+{
+  "name": "rendering-analyzer",
+  "version": "0.0.1",
+  "description": "A tool to analyze rendering code  using simple bindings for measurement",
+  "main": "index.js",
+  "scripts": {
+    "watch": "webpack --watch --mode=development",
+    "build": "webpack --mode=production --optimize-minimize",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "fpr",
+    "perf",
+    "performance",
+    "render",
+    "webgl",
+    "canvas",
+    "animation",
+    "time"
+  ],
+  "author": "jahow",
+  "license": "MIT",
+  "dependencies": {
+    "d3": "^5.7.0",
+    "webpack": "^4.20.2",
+    "webpack-cli": "^3.1.2"
+  }
+}
