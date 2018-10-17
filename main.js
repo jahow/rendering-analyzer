@@ -124,6 +124,14 @@ PerfAnalyzer.prototype.startFrame = function() {
 
 PerfAnalyzer.prototype.endFrame = function() {
   this._currentFrame.total = performance.now() - this._currentFrameStart;
+
+  // compute remaining (time that was not measured explicitly)
+  var rem = this._currentFrame.total;
+  Object.keys(this._currentFrame.measures).forEach(
+    name => (rem -= this._currentFrame.measures[name])
+  );
+  this._currentFrame.measures._remaining = rem;
+
   this._frames.push(this._currentFrame);
   this._currentMeasureName = null;
   this._currentFrame = null;

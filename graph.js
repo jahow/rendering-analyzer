@@ -18,10 +18,8 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
   var frameWidth = 4;
   var framePadding = 1;
   var maxVisibleFrames = Math.floor(graphWidth / (frameWidth + framePadding));
-  var visibleFrames =
-    frames.length > maxVisibleFrames
-      ? frames.slice(frames.length - maxVisibleFrames, frames.length - 1)
-      : frames;
+  var frameOffset = Math.max(0, frames.length - maxVisibleFrames);
+  var visibleFrames = frames.slice(frameOffset);
   var measureNames = Object.keys(knownMeasures);
   measureNames.push('_remaining');
 
@@ -30,12 +28,6 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
     svg = d3.select(domElement).append('svg');
     svg.append('g').attr('id', 'perfanalyzer-times');
     svg.append('g').attr('id', 'perfanalyzer-events');
-
-    // update size
-    svg
-      .attr('width', graphWidth)
-      .attr('height', graphHeight)
-      .attr('transform', `translate(${padding}, ${padding})`);
 
     // target frame time
     var lineY =
@@ -67,16 +59,11 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
       .style('display', 'none');
   }
 
-  // data preparation: compute remaining time
-  visibleFrames
-    .filter(frame => frame.measures._remaining === undefined)
-    .forEach(function(frame) {
-      var rem = frame.total;
-      Object.keys(frame.measures).forEach(name => {
-        rem -= frame.measures[name];
-      });
-      frame.measures._remaining = rem;
-    });
+  // update size
+  svg
+    .attr('width', graphWidth)
+    .attr('height', graphHeight)
+    .attr('transform', `translate(${padding}, ${padding})`);
 
   // update stacked bars (times)
   var stack = d3
@@ -101,12 +88,14 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
 
   // add rect for bars inside a series
   bars = bars.selectAll('rect').data(d => d);
-  bars.enter().append('rect');
   bars.exit().remove();
   bars
-    .attr('height', d => ((d[1] - d[0]) / maxFrameTime) * graphHeight)
-    .attr('width', frameWidth)
+    .enter()
+    .append('rect')
+    .attr('width', frameWidth);
+  bars
     .attr('x', (d, i) => i * (frameWidth + framePadding))
+    .attr('height', d => ((d[1] - d[0]) / maxFrameTime) * graphHeight)
     .attr('y', function(d) {
       return (
         graphHeight -
@@ -136,9 +125,10 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
 
       // update rect & pos
       var tooltipRect = tooltip.select('rect');
-      var xPosition = i * (frameWidth + framePadding) + frameWidth / 2 - 50;
-      var yPosition =
+      var xPos = i * (frameWidth + framePadding) + frameWidth / 2 - 50;
+      xPos = Math.min(graphWidth - 100, Math.max(0, xPos));
+      var yPos =
         Math.min(graphHeight * (d.data.total / maxFrameTime), graphHeight) + 10;
-      tooltip.style('transform', `translate(${xPosition}px,${-yPosition}px)`);
+      tooltip.style('transform', `translate(${xPos}px,${-yPos}px)`);
     });
 }
