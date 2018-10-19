@@ -118,23 +118,30 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
       var text = `total: ${d.data.total.toFixed(1)}`;
       measureNames.forEach(
         name =>
-          (text += `<br>${name}: ${(d.data.measures[name] || 0).toFixed(1)}`)
+          (text += `<br><span style="color: ${
+            knownMeasures[name] ? knownMeasures[name].color : 'steelblue'
+          }">■</span> ${name}: ${(d.data.measures[name] || 0).toFixed(1)}`)
       );
       if (Object.keys(d.data.events).length) {
-        text += `<br>events:`;
+        text += `<br><br>events:`;
         Object.keys(d.data.events).forEach(event => {
           text += `<br> • ${d.data.events[event]} × ${event}`;
         });
       }
       tooltip.html(text);
+      tooltip.style('left', `auto`);
+      tooltip.style('right', `auto`);
 
       // update rect & pos
       var halfWidth = tooltip.node().clientWidth / 2;
       var xPos = i * (frameWidth + framePadding) + frameWidth / 2 - halfWidth;
-      xPos = Math.min(graphWidth - halfWidth, Math.max(0, xPos));
       var yPos =
         Math.min(graphHeight * (d.data.total / maxFrameTime), graphHeight) + 10;
+      if (xPos < graphWidth - halfWidth * 2) {
+        tooltip.style('left', `${Math.max(0, xPos)}px`);
+      } else {
+        tooltip.style('right', `0px`);
+      }
       tooltip.style('bottom', `${yPos}px`);
-      tooltip.style('left', `${xPos}px`);
     });
 }

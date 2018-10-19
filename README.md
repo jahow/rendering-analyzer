@@ -18,9 +18,9 @@ The script will add an object to the global scope named `PERF_ANALYZER`. The fol
 
   Starts measuring a process in the current frame. Color must be CSS-compatible and will be used in the graph.
 
-- `PERF_ANALYZER.endMeasurement(name)`
+- `PERF_ANALYZER.endMeasurement()`
 
-  Stops measuring a process in the current frame.
+  Stops the current process measurement.
 
 - `PERF_ANALYZER.signalEvent(name)`
 

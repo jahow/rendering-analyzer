@@ -59,11 +59,11 @@ PerfAnalyzer.prototype.beginMeasurement = function(name, color) {
     return;
   }
   if (this._currentMeasureName) {
-    console.error(
-      'PerfAnalyser error: starting a measurement while another one is running - ',
-      name
+    console.warn(
+      'PerfAnalyser error: a measurement was started but not ended',
+      this._currentMeasureName
     );
-    return;
+    this.endMeasurement();
   }
   if (!this._knownMeasures[name]) {
     this._knownMeasures[name] = {
@@ -79,25 +79,16 @@ PerfAnalyzer.prototype.beginMeasurement = function(name, color) {
   this._currentMeasureStart = performance.now();
 };
 
-PerfAnalyzer.prototype.endMeasurement = function(name) {
+PerfAnalyzer.prototype.endMeasurement = function() {
   if (!this._currentMeasureName) {
     console.error(
-      "PerfAnalyser error: ending a measurement that hasn't been started - ",
-      name
-    );
-    return;
-  }
-  if (this._currentMeasureName !== name) {
-    console.error(
-      'PerfAnalyser error: ending a measurement different than the one started - ',
-      name
+      "PerfAnalyser error: ending a measurement that hasn't been started"
     );
     return;
   }
   if (!this._currentFrame) {
     console.error(
-      'PerfAnalyser error: ending a measurement without a current frame - ',
-      name
+      'PerfAnalyser error: ending a measurement without a current frame'
     );
     return;
   }
@@ -123,6 +114,14 @@ PerfAnalyzer.prototype.startFrame = function() {
 };
 
 PerfAnalyzer.prototype.endFrame = function() {
+  if (this._currentMeasureName) {
+    console.warn(
+      'PerfAnalyser error: a measurement was started but not ended',
+      this._currentMeasureName
+    );
+    this.endMeasurement();
+  }
+
   this._currentFrame.total = performance.now() - this._currentFrameStart;
 
   // compute remaining (time that was not measured explicitly)
