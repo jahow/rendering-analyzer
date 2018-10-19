@@ -22,13 +22,11 @@ The script will add an object to the global scope named `PERF_ANALYZER`. The fol
 
   Stops the current process measurement.
 
-- `PERF_ANALYZER.signalEvent(name)`
+- `PERF_ANALYZER.signalEvent(name, color, char)`
 
-  Records an event in the current frame. This will be visible when hovering the graph with the mouse.
+  Records an event in the current frame. This will be visible when hovering the graph with the mouse. Color must be CSS-compatible.
 
 ## To Do
 
 - print report in console
 - export report as JSON
-- show events on graph
-- performance improvement

@@ -10,18 +10,21 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
   }
 
   // params
-  var padding = 8;
+  var padding = 4;
+  var framePadding = 1;
+  var frameWidth = 4;
+  var displayedEvents = 4;
+  var eventZoneHeight = displayedEvents * (framePadding + frameWidth);
   var targetFrameTime = 16.6;
   var maxFrameTime = targetFrameTime * 4;
   var graphWidth = domElement.clientWidth - padding * 2;
-  var graphHeight = domElement.clientHeight - padding * 2;
-  var frameWidth = 4;
-  var framePadding = 1;
+  var graphHeight = domElement.clientHeight - padding * 3 - eventZoneHeight;
   var maxVisibleFrames = Math.floor(graphWidth / (frameWidth + framePadding));
   var frameOffset = Math.max(0, frames.length - maxVisibleFrames);
   var visibleFrames = frames.slice(frameOffset);
   var measureNames = Object.keys(knownMeasures);
   measureNames.push('_remaining');
+  var eventNames = Object.keys(knownEvents);
 
   // init
   if (!svg) {
@@ -42,6 +45,7 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
       .attr('y1', lineY)
       .attr('y2', lineY);
 
+    // tooltip
     tooltip = d3
       .select(domElement)
       .append('div')
@@ -61,7 +65,7 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
   // update size
   svg
     .attr('width', graphWidth)
-    .attr('height', graphHeight)
+    .attr('height', graphHeight + eventZoneHeight + framePadding)
     .attr('transform', `translate(${padding}, ${padding})`);
 
   // generate data series for staked bar chart (keys are added on items)
@@ -155,4 +159,45 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
       }
       tooltip.style('bottom', `${yPos}px`);
     });
+
+  // events: compute stacked series
+  var eventStack = d3
+    .stack()
+    .keys(eventNames)
+    .value((d, key) => (d.events[key] ? 1 : 0));
+  var eventsData = eventStack(visibleFrames);
+  for (let i = 0; i < eventsData.length; i++) {
+    for (let j = 0; j < eventsData[i].length; j++) {
+      eventsData[i][j].key = `frame${j + frameOffset}`;
+      eventsData[i][j].event = eventsData[i].key;
+    }
+  }
+  var events = svg
+    .select('g#perfanalyzer-events')
+    .selectAll('g.event-stack')
+    .data(eventsData);
+
+  // generate svg
+  events
+    .enter()
+    .append('g')
+    .attr('class', 'event-stack');
+  events.exit().remove();
+  events.attr(
+    'transform',
+    `translate(${-frameOffset * (frameWidth + framePadding)}, 0)`
+  );
+
+  events = events.selectAll('text').data(d => d, d => d.key);
+  events.exit().remove();
+  events
+    .enter()
+    .append('text')
+    .attr('font-size', d => (d[1] > d[0] ? frameWidth + 2 : 0))
+    .attr('y', function(d) {
+      return graphHeight + padding * 2 + d[0] * (frameWidth + framePadding);
+    })
+    .attr('x', (d, i) => (i + frameOffset) * (frameWidth + framePadding))
+    .attr('fill', d => knownEvents[d.event].color)
+    .text(d => knownEvents[d.event].char);
 }

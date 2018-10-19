@@ -5,11 +5,11 @@ function PerfAnalyzer() {
   this._element.className = 'rendering-analyzer-graph-container';
   this._element.style.cssText = `
     position: fixed;
-    left: 5px;
-    bottom: 5px;
-    right: 5px;
+    left: 0px;
+    bottom: 0px;
+    right: 0px;
     background: rgba(255, 255, 255, 0.8);
-    height: 150px;`;
+    height: 180px;`;
 
   document.addEventListener(
     'DOMContentLoaded',
@@ -140,8 +140,8 @@ PerfAnalyzer.prototype.endFrame = function() {
 };
 
 // color must CSS compatible
-// shape is 'square', 'diamond', 'circle'
-PerfAnalyzer.prototype.signalEvent = function(name, color, shape) {
+// char is any kind of text (unicode for symbols)
+PerfAnalyzer.prototype.signalEvent = function(name, color, char) {
   if (!this._currentFrame) {
     console.error(
       'PerfAnalyser error: signalling an event without a current frame - ',
@@ -152,7 +152,7 @@ PerfAnalyzer.prototype.signalEvent = function(name, color, shape) {
   if (!this._knownEvents[name]) {
     this._knownEvents[name] = {
       color: color,
-      shape: shape
+      char: char
     };
   }
 
