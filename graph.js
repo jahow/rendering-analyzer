@@ -64,12 +64,19 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
     .attr('height', graphHeight)
     .attr('transform', `translate(${padding}, ${padding})`);
 
-  // update stacked bars (times)
+  // generate data series for staked bar chart (keys are added on items)
   var stack = d3
     .stack()
     .keys(measureNames)
     .value((d, key) => d.measures[key] || 0);
   var framesData = stack(visibleFrames);
+  for (let i = 0; i < framesData.length; i++) {
+    for (let j = 0; j < framesData[i].length; j++) {
+      framesData[i][j].key = `frame${j + frameOffset}`;
+    }
+  }
+
+  // update stacked bars (times)
   var bars = svg
     .select('g#perfanalyzer-times')
     .selectAll('g.frame-stack')
@@ -81,19 +88,22 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
     .append('g')
     .attr('class', 'frame-stack');
   bars.exit().remove();
-  bars.attr('fill', function(d, i) {
-    return knownMeasures[d.key] ? knownMeasures[d.key].color : 'steelblue';
-  });
+  bars
+    .attr('fill', function(d, i) {
+      return knownMeasures[d.key] ? knownMeasures[d.key].color : 'steelblue';
+    })
+    .attr(
+      'transform',
+      `translate(${-frameOffset * (frameWidth + framePadding)}, 0)`
+    );
 
   // add rect for bars inside a series
-  bars = bars.selectAll('rect').data(d => d);
+  bars = bars.selectAll('rect').data(d => d, d => d.key);
   bars.exit().remove();
   bars
     .enter()
     .append('rect')
-    .attr('width', frameWidth);
-  bars
-    .attr('x', (d, i) => i * (frameWidth + framePadding))
+    .attr('width', frameWidth)
     .attr('height', d => ((d[1] - d[0]) / maxFrameTime) * graphHeight)
     .attr('y', function(d) {
       return (
@@ -101,7 +111,8 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
         this.getAttribute('height') -
         (d[0] / maxFrameTime) * graphHeight
       );
-    });
+    })
+    .attr('x', (d, i) => (i + frameOffset) * (frameWidth + framePadding));
 
   // tooltip
   bars
