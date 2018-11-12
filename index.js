@@ -11,15 +11,6 @@ function PerfAnalyzer() {
     background: rgba(255, 255, 255, 0.8);
     height: 180px;`;
 
-  document.addEventListener(
-    'DOMContentLoaded',
-    function() {
-      document.body.appendChild(this._element);
-      console.log('PerfAnalyzer graph was added to the page.');
-    }.bind(this),
-    false
-  );
-
   // each entry will hold the keys `measures` and `events`
   this._frames = [];
   this._currentFrameStart = -1;
@@ -33,10 +24,22 @@ function PerfAnalyzer() {
   // events colors & shapes
   this._knownEvents = {};
 
-  requestAnimationFrame(this.render.bind(this));
-
-  console.log('PerfAnalyzer object was correctly initialized.');
+  this._showGraph = false;
 }
+
+PerfAnalyzer.prototype.showGraph = function(value) {
+  this._showGraph = !!value;
+
+  if (this._showGraph) {
+    document.addEventListener(
+      'DOMContentLoaded',
+      function() {
+        document.body.appendChild(this._element);
+      }.bind(this),
+      false
+    );
+  }
+};
 
 PerfAnalyzer.prototype.render = function() {
   renderGraph(
@@ -136,7 +139,9 @@ PerfAnalyzer.prototype.endFrame = function() {
   this._currentFrame = null;
   this._currentFrameStart = -1;
 
-  this.render();
+  if (this._showGraph) {
+    this.render();
+  }
 };
 
 // color must CSS compatible
@@ -147,6 +152,7 @@ PerfAnalyzer.prototype.signalEvent = function(name, color, char) {
       'PerfAnalyser error: signalling an event without a current frame - ',
       name
     );
+    return;
   }
 
   if (!this._knownEvents[name]) {
@@ -166,5 +172,10 @@ PerfAnalyzer.prototype.signalEvent = function(name, color, char) {
 // time is the span to print (optional)
 PerfAnalyzer.prototype.printReport = function(time) {};
 
-// global
-window.PERF_ANALYZER = new PerfAnalyzer();
+PerfAnalyzer.prototype.getFramesData = function() {
+  return {
+    frames: this._frames
+  };
+};
+
+export default new PerfAnalyzer();
