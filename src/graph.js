@@ -1,36 +1,37 @@
 import * as d3 from 'd3';
-import * as Utils from './utils';
+import {getCssColorFromString} from './utils'
 
 var svg;
 var tooltip;
 
-export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
+/**
+ *
+ * @param {HTMLElement} domElement
+ * @param {FrameStats[]} frames
+ * @param {string[]} trackedClasses
+ */
+export function renderGraph(domElement, frames, trackedClasses) {
   if (!domElement || !domElement.clientWidth) {
     return;
   }
 
   // params
-  var padding = 4;
-  var framePadding = 1;
-  var frameWidth = 4;
-  var displayedEvents = 4;
-  var eventZoneHeight = displayedEvents * (framePadding + frameWidth);
-  var targetFrameTime = 16.6;
-  var maxFrameTime = targetFrameTime * 4;
-  var graphWidth = domElement.clientWidth - padding * 2;
-  var graphHeight = domElement.clientHeight - padding * 3 - eventZoneHeight;
-  var maxVisibleFrames = Math.floor(graphWidth / (frameWidth + framePadding));
-  var frameOffset = Math.max(0, frames.length - maxVisibleFrames);
-  var visibleFrames = frames.slice(frameOffset);
-  var measureNames = Object.keys(knownMeasures);
-  measureNames.push('_remaining');
-  var eventNames = Object.keys(knownEvents);
+  let padding = 4;
+  let framePadding = 1;
+  let frameWidth = 4;
+  let targetFrameTime = 16.6;
+  let maxFrameTime = targetFrameTime * 4;
+  let graphWidth = domElement.clientWidth - padding * 2;
+  let graphHeight = domElement.clientHeight - padding * 3;
+  let maxVisibleFrames = Math.floor(graphWidth / (frameWidth + framePadding));
+  let frameOffset = Math.max(0, frames.length - maxVisibleFrames);
+  let visibleFrames = frames.slice(frameOffset);
+  const knownClasses = trackedClasses.slice().reverse()
 
   // init
   if (!svg) {
     svg = d3.select(domElement).append('svg');
     svg.append('g').attr('id', 'perfanalyzer-times');
-    svg.append('g').attr('id', 'perfanalyzer-events');
 
     // target frame time
     var lineY =
@@ -65,14 +66,14 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
   // update size
   svg
     .attr('width', graphWidth)
-    .attr('height', graphHeight + eventZoneHeight + framePadding)
+    .attr('height', graphHeight + framePadding)
     .attr('transform', `translate(${padding}, ${padding})`);
 
-  // generate data series for staked bar chart (keys are added on items)
+  // generate data series for stacked bar chart (keys are added on items)
   var stack = d3
     .stack()
-    .keys(measureNames)
-    .value((d, key) => d.measures[key] || 0);
+    .keys(knownClasses)
+    .value((d, key) => key in d.classes ? d.classes[key].spentTotalMs : 0);
   var framesData = stack(visibleFrames);
   for (let i = 0; i < framesData.length; i++) {
     for (let j = 0; j < framesData[i].length; j++) {
@@ -94,7 +95,7 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
   bars.exit().remove();
   bars
     .attr('fill', function(d, i) {
-      return knownMeasures[d.key] ? knownMeasures[d.key].color : 'steelblue';
+      return getCssColorFromString(d.key);
     })
     .attr(
       'transform',
@@ -130,19 +131,13 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
     })
     .on('mousemove', function(d, i) {
       // tooltip content
-      var text = `total: ${d.data.total.toFixed(1)}`;
-      measureNames.forEach(
-        name =>
+      var text = `total: ${d.data.duration.toFixed(1)}`;
+      knownClasses.forEach(
+        className =>
           (text += `<br><span style="color: ${
-            knownMeasures[name] ? knownMeasures[name].color : 'steelblue'
-          }">■</span> ${name}: ${(d.data.measures[name] || 0).toFixed(1)}`)
+            getCssColorFromString(className)
+          }">■</span> ${className}: ${(className in d.data.classes ? d.data.classes[className].spentTotalMs : 0).toFixed(1)}`)
       );
-      if (Object.keys(d.data.events).length) {
-        text += `<br><br>events:`;
-        Object.keys(d.data.events).forEach(event => {
-          text += `<br> • ${d.data.events[event]} × ${event}`;
-        });
-      }
       tooltip.html(text);
       tooltip.style('left', `auto`);
       tooltip.style('right', `auto`);
@@ -151,7 +146,7 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
       var halfWidth = tooltip.node().clientWidth / 2;
       var xPos = i * (frameWidth + framePadding) + frameWidth / 2 - halfWidth;
       var yPos =
-        Math.min(graphHeight * (d.data.total / maxFrameTime), graphHeight) + 10;
+        Math.min(graphHeight * (d.data.duration / maxFrameTime), graphHeight) + 10;
       if (xPos < graphWidth - halfWidth * 2) {
         tooltip.style('left', `${Math.max(0, xPos)}px`);
       } else {
@@ -159,45 +154,4 @@ export function renderGraph(domElement, frames, knownMeasures, knownEvents) {
       }
       tooltip.style('bottom', `${yPos}px`);
     });
-
-  // events: compute stacked series
-  var eventStack = d3
-    .stack()
-    .keys(eventNames)
-    .value((d, key) => (d.events[key] ? 1 : 0));
-  var eventsData = eventStack(visibleFrames);
-  for (let i = 0; i < eventsData.length; i++) {
-    for (let j = 0; j < eventsData[i].length; j++) {
-      eventsData[i][j].key = `frame${j + frameOffset}`;
-      eventsData[i][j].event = eventsData[i].key;
-    }
-  }
-  var events = svg
-    .select('g#perfanalyzer-events')
-    .selectAll('g.event-stack')
-    .data(eventsData);
-
-  // generate svg
-  events
-    .enter()
-    .append('g')
-    .attr('class', 'event-stack');
-  events.exit().remove();
-  events.attr(
-    'transform',
-    `translate(${-frameOffset * (frameWidth + framePadding)}, 0)`
-  );
-
-  events = events.selectAll('text').data(d => d, d => d.key);
-  events.exit().remove();
-  events
-    .enter()
-    .append('text')
-    .attr('font-size', d => (d[1] > d[0] ? frameWidth + 2 : 0))
-    .attr('y', function(d) {
-      return graphHeight + padding * 2 + d[0] * (frameWidth + framePadding);
-    })
-    .attr('x', (d, i) => (i + frameOffset) * (frameWidth + framePadding))
-    .attr('fill', d => knownEvents[d.event].color)
-    .text(d => knownEvents[d.event].char);
 }

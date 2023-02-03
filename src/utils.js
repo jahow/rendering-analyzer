@@ -1,6 +1,6 @@
 // inputs are [0,1] values
 // output is a {r, g, b} object with [0-255] values
-export function getRandomColor(hue, value, saturation) {
+function HSVtoRGB(hue, value, saturation) {
   // HSV to RGB conversion, as seen here: http://axonflux.com/handy-rgb-to-hsl-and-rgb-to-hsv-color-model-c
   var r, g, b, i, f, p, q, t;
   i = Math.floor(hue * 6);
@@ -36,13 +36,17 @@ export function getRandomColor(hue, value, saturation) {
   };
 }
 
-export function formatColorCss(color) {
+function formatColorCss(color) {
   return `#${color.r.toString(16)}${color.g.toString(16)}${color.b.toString(
     16
   )}`;
 }
 
+const colorCache = {}
+
 export function getCssColorFromString(string) {
+  if (colorCache[string]) return colorCache[string]
+
   let hashCode = 0;
   for (let i = 0; i < string.length; i++) {
     hashCode += string.charCodeAt(i) + ((hashCode << 5) - hashCode);
@@ -52,5 +56,7 @@ export function getCssColorFromString(string) {
   hashCode *= 0.001;
   hashCode -= Math.floor(hashCode);
 
-  return formatColorCss(getRandomColor(hashCode, 0.87, 0.89));
+  const color = formatColorCss(HSVtoRGB(hashCode, 0.87, 0.89));
+  colorCache[string] = color
+  return color
 }

@@ -2,7 +2,7 @@
   "name": "rendering-analyzer",
   "version": "0.0.1",
   "description": "A tool to analyze rendering code  using simple bindings for measurement",
-  "main": "index.js",
+  "main": "src/index.js",
   "scripts": {
     "watch": "webpack --watch --mode=development",
     "build": "webpack --mode=production --optimize-minimize",
