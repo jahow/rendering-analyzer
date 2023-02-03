@@ -131,7 +131,7 @@ export function renderGraph(domElement, frames, trackedClasses) {
     })
     .on('mousemove', function(d, i) {
       // tooltip content
-      var text = `total: ${d.data.duration.toFixed(1)}`;
+      var text = `total: ${(d.data.spentSyncMs + d.data.spentAsyncMs).toFixed(1)}`;
       knownClasses.forEach(
         className =>
           (text += `<br><span style="color: ${
@@ -146,7 +146,7 @@ export function renderGraph(domElement, frames, trackedClasses) {
       var halfWidth = tooltip.node().clientWidth / 2;
       var xPos = i * (frameWidth + framePadding) + frameWidth / 2 - halfWidth;
       var yPos =
-        Math.min(graphHeight * (d.data.duration / maxFrameTime), graphHeight) + 10;
+        Math.min(graphHeight * ((d.data.spentSyncMs + d.data.spentAsyncMs) / maxFrameTime), graphHeight) + 10;
       if (xPos < graphWidth - halfWidth * 2) {
         tooltip.style('left', `${Math.max(0, xPos)}px`);
       } else {

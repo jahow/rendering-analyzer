@@ -3,7 +3,7 @@ import { renderGraph } from './graph';
 let containerEl = null
 
 /**
- * @typedef {{classes: Object.<string, ClassStats>, duration: number}} FrameStats
+ * @typedef {{classes: Object.<string, ClassStats>, spentAsyncMs: number, spentSyncMs: number}} FrameStats
  */
 /**
  * @typedef {{instanceCount: number, methods: Object.<string, FunctionStats>, spentTotalMs: number}} ClassStats
@@ -32,37 +32,38 @@ let currentFrameStart = -1;
  */
 const trackedClasses = ['_remaining']
 
-function newFrame() {
-  if (currentFrame) {
-    currentFrame.duration = performance.now() - currentFrameStart
-    const trackedClassesTotal = Object.keys(currentFrame.classes).reduce((prev, curr) => prev += currentFrame.classes[curr].spentTotalMs, 0)
-    currentFrame.classes['_remaining'] = {
-      spentTotalMs: currentFrame.duration - trackedClassesTotal,
-      instanceCount: 0,
-      methods: {}
-    }
-    frames.push(currentFrame)
+function closeCurrentFrame() {
+  const trackedClassesTotal = Object.keys(currentFrame.classes).reduce((prev, curr) => prev += currentFrame.classes[curr].spentTotalMs, 0)
+  currentFrame.classes['_remaining'] = {
+    spentTotalMs: currentFrame.spentAsyncMs + currentFrame.spentSyncMs - trackedClassesTotal,
+    instanceCount: 0,
+    methods: {}
   }
+}
+
+function newFrame() {
   if (containerEl) {
-    // graph rendering is out of tracked time
     renderGraph(
       containerEl,
       frames,
       trackedClasses
     );
   }
+  closeCurrentFrame()
   currentFrameStart = performance.now()
   currentFrame = {
     classes: {},
-    duration: 0
+    spentSyncMs: 0,
+    spentAsyncMs: 0
   }
+  frames.push(currentFrame)
 }
 
 /**
  * @param {Class|Object} classOrInstance
  * @param {string} [name]
  */
-export function track(classOrInstance, name) {
+export function trackPerformance(classOrInstance, name) {
   const proto = typeof classOrInstance === 'object' ? classOrInstance : classOrInstance.prototype
   const methods = Object.getOwnPropertyNames(proto).filter(prop => typeof proto[prop] === 'function')
   const className = name || classOrInstance.name || '<no name>'
@@ -77,7 +78,6 @@ export function track(classOrInstance, name) {
         spentTotalMs: 0
       }
       const classStats = currentFrame.classes[className]
-
       if (!(methodName in classStats.methods)) classStats.methods[methodName] = {
         spentSyncMs: 0,
         spentAsyncMs: 0,
@@ -85,12 +85,28 @@ export function track(classOrInstance, name) {
       }
       const methodStats = classStats.methods[methodName]
 
+      // track async code through setTimeout
+      const setTimeout_original = globalThis.setTimeout
+      globalThis.setTimeout = function(callback, delay, ...params) {
+        setTimeout_original((...args) => {
+          const start = performance.now()
+          callback(...args)
+          const delta = performance.now() - start
+          methodStats.spentAsyncMs += delta
+          classStats.spentTotalMs += delta
+        }, delay, ...params)
+      }
+
       methodStats.callCount++
       const start = performance.now()
-      proto[originalName].call(this, ...args)
+      const result = proto[originalName].apply(this, args)
       const delta = performance.now() - start
       methodStats.spentSyncMs += delta
       classStats.spentTotalMs += delta
+
+      globalThis.setTimeout = setTimeout_original
+
+      return result
     }
   })
 }
@@ -99,7 +115,7 @@ export function track(classOrInstance, name) {
  * @param {Class|Object} classOrInstance
  * @param {string} methodName
  */
-export function defineFrameStart(classOrInstance, methodName) {
+export function defineFrameContainer(classOrInstance, methodName) {
   const proto = typeof classOrInstance === 'object' ? classOrInstance : classOrInstance.prototype
   const methods = Object.getOwnPropertyNames(proto).filter(prop => typeof proto[prop] === 'function')
   if (methods.indexOf(methodName) === -1) {
@@ -109,7 +125,26 @@ export function defineFrameStart(classOrInstance, methodName) {
   proto[originalName] = proto[methodName]
   proto[methodName] = function(...args) {
     newFrame()
-    proto[originalName].call(this, ...args)
+    const start = performance.now()
+
+    // track async code through setTimeout
+    const setTimeout_original = globalThis.setTimeout
+    globalThis.setTimeout = function(callback, delay, ...params) {
+      setTimeout_original((...args) => {
+        const start = performance.now()
+        callback(...args)
+        const delta = performance.now() - start
+        currentFrame.spentAsyncMs += delta
+      }, delay, ...params)
+    }
+
+    const result = proto[originalName].call(this, ...args)
+    const delta = performance.now() - start
+    currentFrame.spentSyncMs += delta
+
+    globalThis.setTimeout = setTimeout_original
+
+    return result
   }
 }
 
