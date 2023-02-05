@@ -1,8 +1,9 @@
 import * as d3 from 'd3';
 import {getCssColorFromString} from './utils'
 
-var svg;
-var tooltip;
+let svg;
+let tooltip;
+let previousLength = 0
 
 /**
  *
@@ -16,25 +17,28 @@ export function renderGraph(domElement, frames, trackedClasses) {
   }
 
   // params
-  let padding = 4;
-  let framePadding = 1;
-  let frameWidth = 4;
-  let targetFrameTime = 16.6;
-  let maxFrameTime = targetFrameTime * 4;
+  const padding = 4;
+  const framePadding = 1;
+  const frameWidth = 4;
+  const targetFrameTime = 16.6;
+  const maxFrameTime = targetFrameTime * 4;
   let graphWidth = domElement.clientWidth - padding * 2;
   let graphHeight = domElement.clientHeight - padding * 3;
+
   let maxVisibleFrames = Math.floor(graphWidth / (frameWidth + framePadding));
   let frameOffset = Math.max(0, frames.length - maxVisibleFrames);
-  let visibleFrames = frames.slice(frameOffset);
+  const newFrames = frames.slice(previousLength)
+  previousLength = frames.length
   const knownClasses = trackedClasses.slice().reverse()
 
   // init
   if (!svg) {
     svg = d3.select(domElement).append('svg');
+    svg.attr('transform', `translate(${padding}, ${padding})`);
     svg.append('g').attr('id', 'perfanalyzer-times');
 
     // target frame time
-    var lineY =
+    let lineY =
       Math.round(graphHeight * (1 - targetFrameTime / maxFrameTime) + 0.5) -
       0.5;
     svg
@@ -67,91 +71,66 @@ export function renderGraph(domElement, frames, trackedClasses) {
   svg
     .attr('width', graphWidth)
     .attr('height', graphHeight + framePadding)
-    .attr('transform', `translate(${padding}, ${padding})`);
 
   // generate data series for stacked bar chart (keys are added on items)
-  var stack = d3
+  let stack = d3
     .stack()
     .keys(knownClasses)
     .value((d, key) => key in d.classes ? d.classes[key].spentTotalMs : 0);
-  var framesData = stack(visibleFrames);
-  for (let i = 0; i < framesData.length; i++) {
-    for (let j = 0; j < framesData[i].length; j++) {
-      framesData[i][j].key = `frame${j + frameOffset}`;
+  let framesData = stack(newFrames);
+
+  const container = svg.node().getElementById('perfanalyzer-times')
+  container.setAttribute('transform',`translate(${-padding - frameOffset * (frameWidth + framePadding)}, 0)`);
+
+  function handleMouseOver() {
+    tooltip.style('display', null);
+  }
+  function handleMouseOut() {
+    tooltip.style('display', 'none');
+  }
+  function handleMouseMove() {
+    const data = this.frameData
+
+    // tooltip content
+    let text = `total: ${data.spentTotalMs.toFixed(1)}`;
+    knownClasses.forEach(
+      className =>
+        (text += `<br><span style="color: ${
+          getCssColorFromString(className)
+        }">■</span> ${className}: ${(className in data.classes ? data.classes[className].spentTotalMs : 0).toFixed(1)}`)
+    );
+    tooltip.html(text);
+    tooltip.style('left', `auto`);
+    tooltip.style('right', `auto`);
+
+    // update rect & pos
+    let halfWidth = tooltip.node().clientWidth / 2;
+    let xPos = parseFloat(this.getAttribute('x')) + frameWidth / 2 - halfWidth;
+    let yPos =
+      Math.min(graphHeight * (data.spentTotalMs / maxFrameTime), graphHeight) + 10;
+    if (xPos < graphWidth - halfWidth * 2) {
+      tooltip.style('left', `${Math.max(0, xPos)}px`);
+    } else {
+      tooltip.style('right', `0px`);
     }
+    tooltip.style('bottom', `${yPos}px`);
   }
 
-  // update stacked bars (times)
-  var bars = svg
-    .select('g#perfanalyzer-times')
-    .selectAll('g.frame-stack')
-    .data(framesData);
-
-  // add g for series
-  bars
-    .enter()
-    .append('g')
-    .attr('class', 'frame-stack');
-  bars.exit().remove();
-  bars
-    .attr('fill', function(d, i) {
-      return getCssColorFromString(d.key);
-    })
-    .attr(
-      'transform',
-      `translate(${-frameOffset * (frameWidth + framePadding)}, 0)`
-    );
-
-  // add rect for bars inside a series
-  bars = bars.selectAll('rect').data(d => d, d => d.key);
-  bars.exit().remove();
-  bars
-    .enter()
-    .append('rect')
-    .attr('width', frameWidth)
-    .attr('height', d => Math.max(0, ((d[1] - d[0]) / maxFrameTime) * graphHeight))
-    .attr('y', function(d) {
-      return (
-        graphHeight -
-        this.getAttribute('height') -
-        (d[0] / maxFrameTime) * graphHeight
-      );
-    })
-    .attr('x', (d, i) => (i + frameOffset) * (frameWidth + framePadding));
-
-  // tooltip
-  bars
-    .enter()
-    .selectAll('rect')
-    .on('mouseover', function() {
-      tooltip.style('display', null);
-    })
-    .on('mouseout', function() {
-      tooltip.style('display', 'none');
-    })
-    .on('mousemove', function(d, i) {
-      // tooltip content
-      var text = `total: ${d.data.spentTotalMs.toFixed(1)}`;
-      knownClasses.forEach(
-        className =>
-          (text += `<br><span style="color: ${
-            getCssColorFromString(className)
-          }">■</span> ${className}: ${(className in d.data.classes ? d.data.classes[className].spentTotalMs : 0).toFixed(1)}`)
-      );
-      tooltip.html(text);
-      tooltip.style('left', `auto`);
-      tooltip.style('right', `auto`);
-
-      // update rect & pos
-      var halfWidth = tooltip.node().clientWidth / 2;
-      var xPos = i * (frameWidth + framePadding) + frameWidth / 2 - halfWidth;
-      var yPos =
-        Math.min(graphHeight * (d.data.spentTotalMs / maxFrameTime), graphHeight) + 10;
-      if (xPos < graphWidth - halfWidth * 2) {
-        tooltip.style('left', `${Math.max(0, xPos)}px`);
-      } else {
-        tooltip.style('right', `0px`);
-      }
-      tooltip.style('bottom', `${yPos}px`);
-    });
+  for (let i = 0; i < framesData.length; i++) {
+    const series = framesData[i]
+    container.append(...series.map((data, i) => {
+      const rectEl = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+      const height = Math.max(0, ((data[1] - data[0]) / maxFrameTime) * graphHeight)
+      rectEl.setAttribute('width', frameWidth.toString())
+      rectEl.setAttribute('height', height.toString())
+      rectEl.setAttribute('fill', getCssColorFromString(series.key))
+      rectEl.setAttribute('y', (graphHeight - height - (data[0] / maxFrameTime) * graphHeight).toString());
+      rectEl.setAttribute('x', ((i + previousLength) * (frameWidth + framePadding)).toString());
+      rectEl.frameData = data.data;
+      rectEl.addEventListener('mouseover', handleMouseOver)
+      rectEl.addEventListener('mouseout', handleMouseOut)
+      rectEl.addEventListener('mousemove', handleMouseMove)
+      return rectEl
+    }))
+  }
 }
