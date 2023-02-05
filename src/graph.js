@@ -109,7 +109,7 @@ export function renderGraph(domElement, frames, trackedClasses) {
     .enter()
     .append('rect')
     .attr('width', frameWidth)
-    .attr('height', d => ((d[1] - d[0]) / maxFrameTime) * graphHeight)
+    .attr('height', d => Math.max(0, ((d[1] - d[0]) / maxFrameTime) * graphHeight))
     .attr('y', function(d) {
       return (
         graphHeight -

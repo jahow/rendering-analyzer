@@ -19,7 +19,7 @@ export function clearTracking(classOrInstance) {
  * The tracking callback will be called whenever an execution task ends.
  * IMPORTANT: this cannot track time spent in the constructor!
  * @param {Class|Object} classOrInstance
- * @param {(deltaMs: number, methodName: string, invoked: boolean, invocationContext: Object) => void} trackCallback
+ * @param {(spentSelfMs: number, spentTotalMs: number, methodName: string, invoked: boolean, invocationContext: Object) => void} trackCallback
  * @param {string} [singleMethodName]
  */
 export function trackExecutionStats(classOrInstance, trackCallback, singleMethodName) {
@@ -38,52 +38,47 @@ export function trackExecutionStats(classOrInstance, trackCallback, singleMethod
     proto[originalName] = proto[methodName]
 
     proto[methodName] = function(...args) {
-      let timeSpentOutside
       let invocationContext = {}
       const zone = Zone.current.fork({
         name: `tracking-${className}#${methodName}`,
         properties: {
           reportTimeSpentOutside(deltaMs) {
-            timeSpentOutside += deltaMs
+            trackCallback(-deltaMs, 0, methodName, false, invocationContext)
           }
         },
         onInvoke: function(parent, currentZone, targetZone, delegate, applyThis, applyArgs, source) {
-          // only track time if on the deepest zone & not on promise tasks
-          if (!applyThis || currentZone !== targetZone) {
+          const isTargetZone = currentZone === targetZone
+          // do not track time on promise tasks or not on target zone
+          if (!applyThis || !isTargetZone) {
             return parent.invoke(targetZone, delegate, applyThis, applyArgs, source);
           }
-          timeSpentOutside = 0
           const start = performance.now()
           const result = parent.invoke(targetZone, delegate, applyThis, applyArgs, source);
           const delta = performance.now() - start
-          const deltaSelf = delta - timeSpentOutside
           if (delta > 0 && typeof parent.zone.get('reportTimeSpentOutside') === 'function') {
             parent.zone.get('reportTimeSpentOutside')(delta)
           }
-          trackCallback(deltaSelf, methodName, true, invocationContext)
+          trackCallback(delta, delta, methodName, true, invocationContext)
           return result
         },
         onInvokeTask: function(parent, currentZone, targetZone, task, applyThis, applyArgs) {
-          // only track time if on the deepest zone; event tasks are not tracked as they contain macro tasks
-          if (currentZone !== targetZone || task.type === 'eventTask') {
+          // event tasks are not tracked as they contain macro tasks
+          if (task.type === 'eventTask') {
             return parent.invokeTask(targetZone, task, applyThis, applyArgs);
           }
-          timeSpentOutside = 0
           const start = performance.now()
           const result = parent.invokeTask(targetZone, task, applyThis, applyArgs);
           const delta = performance.now() - start
-          const deltaSelf = delta - timeSpentOutside
           if (delta > 0 && typeof parent.zone.get('reportTimeSpentOutside') === 'function') {
             parent.zone.get('reportTimeSpentOutside')(delta)
           }
-          trackCallback(deltaSelf, methodName, false, invocationContext)
+          trackCallback(delta, delta, methodName, false, invocationContext)
           return result
         },
         onHandleError: function (parentZoneDelegate, currentZone, targetZone, error) {
           console.error(error.stack);
         }
       })
-
       return zone.runGuarded(proto[originalName], this, args)
     }
     Object.defineProperty(proto[methodName], 'name', {value: methodName, writable: false})

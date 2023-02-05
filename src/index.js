@@ -1,5 +1,4 @@
 import {renderGraph} from './graph'
-import 'zone.js'
 import {trackExecutionStats} from './tracking'
 
 let containerEl = null
@@ -22,8 +21,6 @@ let currentFrame = {
   duration: 0
 };
 
-let currentFrameStart = -1;
-
 /**
  * @type {FrameStats[]}
  */
@@ -35,20 +32,19 @@ const frames = [currentFrame];
 const trackedClasses = ['_remaining']
 
 function newFrame() {
-  currentFrameStart = performance.now()
+  closeFrame(currentFrame)
   currentFrame = {
     classes: {},
     spentTotalMs: 0
   }
   frames.push(currentFrame)
-  return currentFrame
 }
 
 function closeFrame(frame) {
   let trackedClassesTotal = 0
   for (const className in frame.classes) {
     const classStats = frame.classes[className]
-    const methodsTotal = Object.keys(classStats.methods).reduce((prev, curr) => prev += classStats.methods[curr].spentTotalMs, 0)
+    const methodsTotal = Object.keys(classStats.methods).reduce((prev, curr) => prev + classStats.methods[curr].spentTotalMs, 0)
     classStats.spentTotalMs = methodsTotal
     trackedClassesTotal += methodsTotal
   }
@@ -66,71 +62,17 @@ function closeFrame(frame) {
   }
 }
 
-// const methodTimingZone = Zone.current.fork({
-//   name: 'classMethod',
-//   properties: {
-//     methodStats: null,
-//     classStats: null,
-//     className: null,
-//     methodName: null
-//   },
-//   onInvoke: function(parent, currentZone, targetZone, delegate, applyThis, applyArgs, source) {
-//     const start = performance.now()
-//     const result = parent.invoke(targetZone, delegate, applyThis, applyArgs, source);
-//     const delta = performance.now() - start
-//     targetZone.get('methodStats').spentTotalMs += delta
-//     targetZone.get('methodStats').callCount++
-//     targetZone.get('classStats').spentTotalMs += delta
-//     return result
-//   },
-//   // onFork: function(parent, currentZone, targetZone, zoneSpec) {
-//   //   return parent.fork(targetZone, zoneSpec);
-//   // }
-// })
-
 /**
  * @param {Class|Object} classOrInstance
  * @param {string} methodName
  */
 export function defineFrameContainer(classOrInstance, methodName) {
-  const proto = typeof classOrInstance === 'object' ? classOrInstance : classOrInstance.prototype
-  const methods = Object.getOwnPropertyNames(proto).filter(prop => typeof proto[prop] === 'function')
-  if (methods.indexOf(methodName) === -1) {
-    throw new Error(`perf-analyzer: method #${methodName} not found on ${JSON.stringify(proto)}`)
-  }
-
-  const originalName = `${methodName}__NOFRAMESTART`
-  proto[originalName] = proto[methodName]
-  proto[methodName] = function(...args) {
-    closeFrame(currentFrame)
-    const frame = newFrame()
-    const zone = Zone.current.fork({
-      name: 'frameTiming',
-      onInvoke: function(parent, currentZone, targetZone, delegate, applyThis, applyArgs, source) {
-        const start = performance.now()
-        const result = parent.invoke(targetZone, delegate, applyThis, applyArgs, source);
-        const delta = performance.now() - start
-        frame.spentTotalMs += delta
-        return result
-      },
-      onInvokeTask: function(parent, currentZone, targetZone, task, applyThis, applyArgs) {
-        const start = performance.now()
-        const result = parent.invokeTask(targetZone, task, applyThis, applyArgs);
-        const delta = performance.now() - start
-        frame.spentTotalMs += delta
-        return result;
-      },
-      // onHasTask: (parent, currentZone, targetZone, hasTaskState) => {
-      //   if (!hasTaskState.microTask && !hasTaskState.macroTask){
-      //     closeFrame(frame)
-      //   }
-      // },
-      onHandleError: function (parentZoneDelegate, currentZone, targetZone, error) {
-        console.error(error.stack);
-      }
-    })
-    return zone.runGuarded(proto[originalName], this, args)
-  }
+  trackExecutionStats(classOrInstance, (timeSpentMs, totalSpentMs, methodName, invoked) => {
+    if (invoked) {
+      newFrame()
+    }
+    currentFrame.spentTotalMs += totalSpentMs
+  }, methodName)
 }
 
 /**
@@ -141,7 +83,7 @@ export function trackPerformance(classOrInstance, name) {
   const className = name || classOrInstance.name || '<no name>'
   if (trackedClasses.indexOf(className) === -1) trackedClasses.push(className)
 
-  trackExecutionStats(classOrInstance, (timeSpentMs, methodName, invoked) => {
+  trackExecutionStats(classOrInstance, (timeSpentMs, totalSpentMs, methodName, invoked) => {
     if (!(className in currentFrame.classes)) currentFrame.classes[className] = {
       methods: {},
       instanceCount: 0,
