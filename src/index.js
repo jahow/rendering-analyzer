@@ -1,5 +1,6 @@
 import {renderGraph} from './graph'
 import 'zone.js'
+import {trackExecutionStats} from './tracking'
 
 let containerEl = null
 
@@ -137,75 +138,23 @@ export function defineFrameContainer(classOrInstance, methodName) {
  * @param {string} [name]
  */
 export function trackPerformance(classOrInstance, name) {
-  const proto = typeof classOrInstance === 'object' ? classOrInstance : classOrInstance.prototype
-  const methods = Object.getOwnPropertyNames(proto).filter(prop => typeof proto[prop] === 'function')
   const className = name || classOrInstance.name || '<no name>'
   if (trackedClasses.indexOf(className) === -1) trackedClasses.push(className)
-  methods.forEach((methodName) => {
-    const originalName = `${methodName}__NOPERFSTATS`
-    proto[originalName] = proto[methodName]
 
-    proto[methodName] = function(...args) {
-      if (!(className in currentFrame.classes)) currentFrame.classes[className] = {
-        methods: {},
-        instanceCount: 0,
-        spentTotalMs: 0
-      }
-      const classStats = currentFrame.classes[className]
-      if (!(methodName in classStats.methods)) classStats.methods[methodName] = {
-        spentTotalMs: 0,
-        callCount: 0
-      }
-      const methodStats = classStats.methods[methodName]
-
-      const zone = Zone.current.fork({
-        name: 'classMethod',
-        properties: {
-          // substractTime(delta) {
-          //   methodStats.spentTotalMs -= delta
-          // },
-          // checkNested() {
-          //   console.log(zoneThis.parent)
-          // }
-        },
-        onInvoke: function(parent, currentZone, targetZone, delegate, applyThis, applyArgs, source) {
-          // console.log(`on invoke for ${targetZone.get('className')}#${targetZone.get('methodName')}`)
-          const start = performance.now()
-          const result = parent.invoke(targetZone, delegate, applyThis, applyArgs, source);
-          const delta = performance.now() - start
-          methodStats.spentTotalMs += delta
-          methodStats.callCount++
-          // if (delta > 0 && typeof parent.zone.get('substractTime') === 'function') {
-          //   parent.zone.get('substractTime')(delta)
-          // }
-          return result
-        },
-        onInvokeTask: function(parent, currentZone, targetZone, task, applyThis, applyArgs) {
-          // console.log(`on invoke for ${targetZone.get('className')}#${targetZone.get('methodName')}`)
-          const start = performance.now()
-          const result = parent.invokeTask(targetZone, task, applyThis, applyArgs);
-          const delta = performance.now() - start
-          methodStats.spentTotalMs += delta
-          methodStats.callCount++
-          // if (delta > 0 && typeof parent.zone.get('substractTime') === 'function') {
-          //   parent.zone.get('substractTime')(delta)
-          // }
-          return result
-        },
-        onHandleError: function (parentZoneDelegate, currentZone, targetZone, error) {
-          console.error(error.stack);
-        }
-        // onHasTask: (parent, currentZone, targetZone, hasTaskState) => {
-        //   if (!hasTaskState.microTask && !hasTaskState.macroTask) {
-        //     const methodsTotal = Object.keys(classStats.methods).reduce((prev, curr) => prev += classStats.methods[curr].spentTotalMs, 0)
-        //     classStats.spentTotalMs = methodsTotal
-        //   }
-        //   parent.hasTask(targetZone, hasTaskState)
-        // },
-      })
-
-      return zone.runGuarded(proto[originalName], this, args)
+  trackExecutionStats(classOrInstance, (timeSpentMs, methodName, invoked) => {
+    if (!(className in currentFrame.classes)) currentFrame.classes[className] = {
+      methods: {},
+      instanceCount: 0,
+      spentTotalMs: 0
     }
+    const classStats = currentFrame.classes[className]
+    if (!(methodName in classStats.methods)) classStats.methods[methodName] = {
+      spentTotalMs: 0,
+      callCount: 0
+    }
+    const methodStats = classStats.methods[methodName]
+    methodStats.spentTotalMs += timeSpentMs
+    if (invoked) methodStats.callCount++
   })
 }
 
@@ -224,6 +173,10 @@ right: 0px;
 background: rgba(255, 255, 255, 0.8);
 height: 180px;`;
   document.body.appendChild(containerEl);
+}
+
+export function getFrameStats() {
+  return [...frames]
 }
 
 if (typeof globalThis !== 'undefined') {
