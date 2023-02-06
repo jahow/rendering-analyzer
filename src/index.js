@@ -113,7 +113,7 @@ left: 0px;
 bottom: 0px;
 right: 0px;
 background: rgba(255, 255, 255, 0.8);
-height: 180px;`;
+height: 320px;`;
   document.body.appendChild(containerEl);
 }
 

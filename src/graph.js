@@ -21,7 +21,7 @@ export function renderGraph(domElement, frames, trackedClasses) {
   const framePadding = 1;
   const frameWidth = 4;
   const targetFrameTime = 16.6;
-  const maxFrameTime = targetFrameTime * 4;
+  const maxFrameTime = targetFrameTime * 6;
   let graphWidth = domElement.clientWidth - padding * 2;
   let graphHeight = domElement.clientHeight - padding * 3;
 
