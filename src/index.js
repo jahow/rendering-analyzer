@@ -1,7 +1,10 @@
 import {renderGraph} from './graph'
 import {trackExecutionStats} from './tracking'
+import {renderTable} from './table'
 
-let containerEl = null
+let renderRootEl = null
+let enableGraph = false
+let enableTable = false
 
 /**
  * @typedef {{classes: Object.<string, ClassStats>, spentTotalMs: number}} FrameStats
@@ -53,9 +56,16 @@ function closeFrame(frame) {
     instanceCount: 0,
     methods: {}
   }
-  if (containerEl) {
+  if (enableGraph) {
     renderGraph(
-      containerEl,
+      getRenderRoot(),
+      frames,
+      trackedClasses
+    );
+  }
+  if (enableTable) {
+    renderTable(
+      getRenderRoot(),
       frames,
       trackedClasses
     );
@@ -100,21 +110,31 @@ export function trackPerformance(classOrInstance, name) {
   })
 }
 
-export function showTable() {
-
-}
-
-export function showGraph() {
-  containerEl = document.createElement('div');
-  containerEl.className = 'rendering-analyzer-graph-container';
-  containerEl.style.cssText = `
+function getRenderRoot() {
+  if (!renderRootEl) {
+    renderRootEl = document.createElement('div');
+    renderRootEl.className = 'rendering-analyzer-container';
+    renderRootEl.style.cssText = `
 position: fixed;
 left: 0px;
 bottom: 0px;
 right: 0px;
-background: rgba(255, 255, 255, 0.8);
-height: 320px;`;
-  document.body.appendChild(containerEl);
+display: flex;
+flex-direction: column;
+justify-content: end;
+align-items: end;
+pointer-events: none;`;
+    document.body.appendChild(renderRootEl);
+  }
+  return renderRootEl
+}
+
+export function showTable() {
+  enableTable = true
+}
+
+export function showGraph() {
+  enableGraph = true
 }
 
 export function getFrameStats() {

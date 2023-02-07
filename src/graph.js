@@ -1,19 +1,26 @@
 import * as d3 from 'd3';
 import {getCssColorFromString} from './utils'
 
+let graphRoot;
 let svg;
 let tooltip;
 let previousLength = 0
 
 /**
  *
- * @param {HTMLElement} domElement
+ * @param {HTMLElement} containerElement
  * @param {FrameStats[]} frames
  * @param {string[]} trackedClasses
  */
-export function renderGraph(domElement, frames, trackedClasses) {
-  if (!domElement || !domElement.clientWidth) {
-    return;
+export function renderGraph(containerElement, frames, trackedClasses) {
+  if (!graphRoot) {
+    graphRoot = document.createElement('div')
+    graphRoot.style.cssText = `background: rgba(255, 255, 255, 0.8);
+height: 320px;
+order: 10;
+width: 100%;
+pointer-events: auto;`
+    containerElement.append(graphRoot);
   }
 
   // params
@@ -22,8 +29,8 @@ export function renderGraph(domElement, frames, trackedClasses) {
   const frameWidth = 4;
   const targetFrameTime = 16.6;
   const maxFrameTime = targetFrameTime * 6;
-  let graphWidth = domElement.clientWidth - padding * 2;
-  let graphHeight = domElement.clientHeight - padding * 3;
+  let graphWidth = graphRoot.clientWidth - padding * 2;
+  let graphHeight = graphRoot.clientHeight - padding * 3;
 
   let maxVisibleFrames = Math.floor(graphWidth / (frameWidth + framePadding));
   let frameOffset = Math.max(0, frames.length - maxVisibleFrames);
@@ -33,7 +40,7 @@ export function renderGraph(domElement, frames, trackedClasses) {
 
   // init
   if (!svg) {
-    svg = d3.select(domElement).append('svg');
+    svg = d3.select(graphRoot).append('svg');
     svg.attr('transform', `translate(${padding}, ${padding})`);
     svg.append('g').attr('id', 'perfanalyzer-times');
 
@@ -52,7 +59,7 @@ export function renderGraph(domElement, frames, trackedClasses) {
 
     // tooltip
     tooltip = d3
-      .select(domElement)
+      .select(graphRoot)
       .append('div')
       .attr('id', 'perfanalyzer-tooltip')
       .style('color', 'white')

@@ -16,3 +16,11 @@ The package exposes the following functions:
 - `trackPerformance(classOrInstance, substituteName)`
 
   Time spent in this class or object will be tracked, as well as method calls and instances count.
+
+- `showGraph()`
+
+  Render the frame graph on the page.
+
+- `showTable()`
+
+  Render the stats table on the page.
