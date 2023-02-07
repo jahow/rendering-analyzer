@@ -112,7 +112,7 @@ pointer-events: auto;`
 
     // update rect & pos
     let halfWidth = tooltip.node().clientWidth / 2;
-    let xPos = parseFloat(this.getAttribute('x')) + frameWidth / 2 - halfWidth;
+    let xPos = this.getBoundingClientRect().left + frameWidth / 2 - halfWidth;
     let yPos =
       Math.min(graphHeight * (data.spentTotalMs / maxFrameTime), graphHeight) + 10;
     if (xPos < graphWidth - halfWidth * 2) {

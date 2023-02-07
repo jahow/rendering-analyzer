@@ -10,7 +10,7 @@ let enableTable = false
  * @typedef {{classes: Object.<string, ClassStats>, spentTotalMs: number}} FrameStats
  */
 /**
- * @typedef {{instanceCount: number, methods: Object.<string, FunctionStats>, spentTotalMs: number}} ClassStats
+ * @typedef {{methods: Object.<string, FunctionStats>, spentTotalMs: number}} ClassStats
  */
 /**
  * @typedef {{callCount: number, spentTotalMs: number}} FunctionStats
@@ -28,6 +28,23 @@ let currentFrame = {
  * @type {FrameStats[]}
  */
 const frames = [currentFrame];
+
+/**
+ * @typedef {{maxCallCountPerFrame: number, maxSpentPerFrameMs: number, spentTotalMs: number, totalCallCount: number}} FunctionTotalStats
+ */
+/**
+ * @typedef {{instanceCount: number, methods: Object.<string, FunctionTotalStats>}} ClassTotalStats
+ */
+/**
+ * @typedef {{classes: Object.<string, ClassTotalStats>, exceededFrameBudgetCount: number}} TotalStats
+ */
+/**
+ * @type {TotalStats}
+ */
+const totalStats = {
+  exceededFrameBudgetCount: 0,
+  classes: {}
+}
 
 /**
  * @type {string[]}
@@ -50,12 +67,33 @@ function closeFrame(frame) {
     const methodsTotal = Object.keys(classStats.methods).reduce((prev, curr) => prev + classStats.methods[curr].spentTotalMs, 0)
     classStats.spentTotalMs = methodsTotal
     trackedClassesTotal += methodsTotal
+
+    if (!(className in totalStats.classes)) totalStats.classes[className] = {
+      methods: {},
+      instanceCount: 0
+    }
+    const classTotalStats = totalStats.classes[className];
+    for (const methodName in classTotalStats.methods) {
+      const methodStats = classStats.methods[methodName];
+      const methodTotalStats = classTotalStats.methods[methodName];
+      if (methodStats && methodStats.callCount > methodTotalStats.maxCallCountPerFrame) {
+        methodTotalStats.maxCallCountPerFrame = methodStats.callCount;
+      }
+      if (methodStats && methodStats.callCount > 0) {
+        methodTotalStats.totalCallCount += methodStats.callCount;
+      }
+      if (methodStats && methodStats.spentTotalMs > methodTotalStats.maxSpentPerFrameMs) {
+        methodTotalStats.maxSpentPerFrameMs = methodStats.spentTotalMs;
+      }
+    }
   }
+  if (Math.max(frame.spentTotalMs, trackedClassesTotal) > 16) totalStats.exceededFrameBudgetCount++;
   frame.classes['_remaining'] = {
     spentTotalMs: Math.max(0, frame.spentTotalMs - trackedClassesTotal),
     instanceCount: 0,
     methods: {}
   }
+
   if (enableGraph) {
     renderGraph(
       getRenderRoot(),
@@ -66,7 +104,7 @@ function closeFrame(frame) {
   if (enableTable) {
     renderTable(
       getRenderRoot(),
-      frames,
+      totalStats,
       trackedClasses
     );
   }
@@ -94,9 +132,9 @@ export function trackPerformance(classOrInstance, name) {
   if (trackedClasses.indexOf(className) === -1) trackedClasses.push(className)
 
   trackExecutionStats(classOrInstance, (timeSpentMs, totalSpentMs, methodName, invoked) => {
+    // frame stats
     if (!(className in currentFrame.classes)) currentFrame.classes[className] = {
       methods: {},
-      instanceCount: 0,
       spentTotalMs: 0
     }
     const classStats = currentFrame.classes[className]
@@ -107,6 +145,21 @@ export function trackPerformance(classOrInstance, name) {
     const methodStats = classStats.methods[methodName]
     methodStats.spentTotalMs += timeSpentMs
     if (invoked) methodStats.callCount++
+
+    // total stats
+    if (!(className in totalStats.classes)) totalStats.classes[className] = {
+      methods: {},
+      instanceCount: 0
+    }
+    const classTotalStats = totalStats.classes[className]
+    if (!(methodName in classTotalStats.methods)) classTotalStats.methods[methodName] = {
+      spentTotalMs: 0,
+      maxCallCountPerFrame: 0,
+      maxSpentPerFrameMs: 0,
+      totalCallCount: 0
+    }
+    const methodTotalStats = classTotalStats.methods[methodName]
+    methodTotalStats.spentTotalMs += timeSpentMs
   })
 }
 
