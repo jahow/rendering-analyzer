@@ -1,5 +1,5 @@
 import {renderGraph} from './graph'
-import {trackExecutionStats} from './tracking'
+import {trackExecutionStats, trackInstanceCount} from './tracking'
 import {renderTable} from './table'
 
 let renderRootEl = null
@@ -161,6 +161,16 @@ export function trackPerformance(classOrInstance, name) {
     const methodTotalStats = classTotalStats.methods[methodName]
     methodTotalStats.spentTotalMs += timeSpentMs
   })
+
+  if (typeof classOrInstance !== 'object') {
+    trackInstanceCount(classOrInstance, (count) => {
+      if (!(className in totalStats.classes)) totalStats.classes[className] = {
+        methods: {},
+        instanceCount: 0
+      }
+      totalStats.classes[className].instanceCount = count
+    })
+  }
 }
 
 function getRenderRoot() {

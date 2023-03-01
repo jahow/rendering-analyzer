@@ -7,12 +7,17 @@ export function clearTracking(classOrInstance) {
   const proto = typeof classOrInstance === 'object' ? classOrInstance : classOrInstance.prototype
   const methods = Object.getOwnPropertyNames(proto).filter(prop => typeof proto[prop] === 'function')
 
-  methods.forEach((methodName) => {
-    const originalName = `${methodName}__NOPERFSTATS`
-    if (typeof proto[originalName] === 'undefined') return;
-    proto[methodName] = proto[originalName]
-    delete proto[originalName]
-  })
+  function clean(prefix) {
+    methods.forEach((methodName) => {
+      const originalName = `${methodName}${prefix}`
+      if (typeof proto[originalName] === 'undefined') return;
+      proto[methodName] = proto[originalName]
+      delete proto[originalName]
+    })
+  }
+  clean('__NOPERFSTATS')
+  clean('__NOINSTCOUNT')
+  clearTimeout(proto.__INSTCOUNTTIMEOOUT)
 }
 
 /**
@@ -80,6 +85,52 @@ export function trackExecutionStats(classOrInstance, trackCallback, singleMethod
         }
       })
       return zone.runGuarded(proto[originalName], this, args)
+    }
+    Object.defineProperty(proto[methodName], 'name', {value: methodName, writable: false})
+  })
+}
+
+/**
+ * The tracking callback will be called whenever the instance count changes
+ * @param {Class} trackedClass
+ * @param {(instanceCount: number) => void} countCallback
+ */
+export function trackInstanceCount(trackedClass, countCallback) {
+  const proto = trackedClass.prototype
+  const methods = Object.getOwnPropertyNames(proto).filter(prop => typeof proto[prop] === 'function')
+
+  /** @type {Object.<string, WeakRef>} */
+  const instances = {}
+  let instanceCount = 0
+  function scanInstances() {
+    const keys = Object.keys(instances)
+    let newCount = keys.length
+    for (const key of keys) {
+      if (instances[key].deref()) continue;
+      delete instances[key]
+      newCount--
+    }
+    if (newCount !== instanceCount) {
+      instanceCount = newCount
+      countCallback(newCount)
+    }
+    proto.__INSTCOUNTTIMEOOUT = setTimeout(scanInstances, 200)
+  }
+  scanInstances()
+
+  methods.forEach((methodName) => {
+    const originalName = `${methodName}__NOINSTCOUNT`
+    proto[originalName] = proto[methodName]
+
+    proto[methodName] = function(...args) {
+      if (!this.__perfId) {
+        this.__perfId = Math.floor(Math.random() * 100000)
+        instances[this.__perfId] = new WeakRef(this)
+        const newCount = Object.keys(instances).length
+        instanceCount = newCount
+        countCallback(newCount)
+      }
+      return proto[originalName].apply(this, args)
     }
     Object.defineProperty(proto[methodName], 'name', {value: methodName, writable: false})
   })
