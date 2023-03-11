@@ -1,13 +1,18 @@
 {
-  "name": "rendering-analyzer",
-  "version": "0.0.1",
-  "description": "A tool to analyze rendering code  using simple bindings for measurement",
+  "name": "@camptocamp/rendering-analyzer",
+  "version": "0.1.0",
+  "description": "A tool to visually analyze time spent in code",
   "main": "src/index.js",
   "scripts": {
     "watch": "webpack --watch --mode=development",
     "build": "webpack --mode=production --optimize-minimize",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "prepublishOnly": "npm test && npm run build"
   },
+  "files": [
+    "dist/",
+    "src/"
+  ],
   "keywords": [
     "fpr",
     "perf",
@@ -18,8 +23,8 @@
     "animation",
     "time"
   ],
-  "author": "jahow",
-  "license": "MIT",
+  "author": "olivia.guyot@camptocamp.com",
+  "license": "GPL-3.0-or-later",
   "dependencies": {
     "d3": "^5.7.0"
   },

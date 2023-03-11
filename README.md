@@ -2,7 +2,17 @@
 
 ## Usage
 
-The package is not published for now. Build the javascript bundle with `npm run build` and include it in your page.
+To install, run:
+
+```bash
+$ npm install --save @camptocamp/rendering-analyzer
+```
+
+To use, import API symbols like so:
+
+```js
+import { defineFrameContainer, trackPerformance } from '@camptocamp/rendering-analyzer';
+```
 
 The package exposes the following functions:
 
