@@ -18,6 +18,7 @@ background: rgba(255, 255, 255, 0.8);
 font-family: monospace;
 font-size: 12px;
 width: 400px;
+order: 8;
 pointer-events: auto;`
     const title = document.createElement('div')
     title.innerText = 'PERFORMANCE STATS';

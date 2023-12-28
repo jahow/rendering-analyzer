@@ -1,6 +1,8 @@
 import {renderGraph} from './graph'
 import {trackExecutionStats, trackInstanceCount} from './tracking'
 import {renderTable} from './table'
+import {formatFrameStatsAsTable, formatTotalStatsAsTable} from './export'
+import {download, generateCsv, mkConfig} from 'export-to-csv'
 
 let renderRootEl = null
 let enableGraph = false
@@ -173,6 +175,25 @@ export function trackPerformance(classOrInstance, name) {
   }
 }
 
+export function downloadDataAsCsv() {
+  const date = new Date().toISOString().substring(0, 19)
+  let csvConfig = mkConfig({ useKeysAsHeaders: true, filename: `total-stats-${date}` });
+  let data = formatTotalStatsAsTable(totalStats)
+  let csv = generateCsv(csvConfig)(data);
+  download(csvConfig)(csv)
+  csvConfig = mkConfig({ useKeysAsHeaders: true, filename: `frame-stats-${date}` });
+  data = formatFrameStatsAsTable(frames)
+  csv = generateCsv(csvConfig)(data);
+  download(csvConfig)(csv)
+}
+
+export function printDataToConsole() {
+  let data = formatTotalStatsAsTable(totalStats)
+  console.table(data)
+  data = formatFrameStatsAsTable(frames)
+  console.table(data)
+}
+
 function getRenderRoot() {
   if (!renderRootEl) {
     renderRootEl = document.createElement('div');
@@ -187,6 +208,24 @@ flex-direction: column;
 justify-content: end;
 align-items: end;
 pointer-events: none;`;
+    const actionsRoot = document.createElement('div')
+    actionsRoot.style = `background: rgba(255, 255, 255, 0.8);
+padding: 8px;
+order: 6;
+pointer-events: auto;
+display: flex;
+gap: 8px;`
+    const downloadBtn = document.createElement('button')
+    downloadBtn.type = 'button'
+    downloadBtn.innerText = 'Download as CSV'
+    downloadBtn.addEventListener('click', downloadDataAsCsv)
+    const printBtn = document.createElement('button')
+    printBtn.type = 'button'
+    printBtn.innerText = 'Print results to console'
+    printBtn.addEventListener('click', printDataToConsole)
+    actionsRoot.appendChild(downloadBtn)
+    actionsRoot.appendChild(printBtn)
+    renderRootEl.appendChild(actionsRoot)
     document.body.appendChild(renderRootEl);
   }
   return renderRootEl

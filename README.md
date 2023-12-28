@@ -34,3 +34,11 @@ The package exposes the following functions:
 - `showTable()`
 
   Render the stats table on the page.
+
+- `downloadDataAsCsv()`
+
+  Downloads two CSV files: one for the stats gathered on each tracked classes, and one for the detailed stats of each frame.
+
+- `printDataToConsole()`
+
+  Same as above but both datasets are simply dumped to the browser console.
